@@ -1,0 +1,37 @@
+- name: "mistral"
+  parameters:
+    model: mistral.gguf
+
+  context_size: 8192
+  mmap: true
+  stopwords:
+  - "<|im_end|>"
+  - "<dummy32000>"
+  - "</tool_call>"
+  - "<|eot_id|>"
+  - "<|end_of_text|>"
+  - "</s>"
+  - "[/TOOL_CALLS]"
+  - "[/ACTIONS]"
+
+  function:
+    disable_no_action: true
+
+  template:
+    join_chat_messages_by_character: ""
+    chat: |
+      {{.Input -}}
+    chat_message: |-
+      {{if eq .RoleName "user" -}}
+      [INST] {{.Content }} [/INST]
+      {{- else if .FunctionCall -}}
+      [TOOL_CALLS] {{toJson .FunctionCall}} [/TOOL_CALLS]
+      {{- else if eq .RoleName "tool" -}}
+      [TOOL_RESULTS] {{.Content}} [/TOOL_RESULTS]
+      {{- else -}}
+      {{ .Content -}}
+      {{ end -}}
+    completion: |
+      {{.Input}}
+    function: |-
+      [AVAILABLE_TOOLS] [{{range .Functions}}{"type": "function", "function": {"name": "{{.Name}}", "description": "{{.Description}}", "parameters": {{toJson .Parameters}} }}{{end}} ] [/AVAILABLE_TOOLS]{{.Input }}
