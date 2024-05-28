@@ -24,12 +24,9 @@ RUN apt-get update && \
         cmake \
         curl \
         git \
-        python3-pip \
-        python-is-python3 \
         unzip && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    pip install --upgrade pip
+    rm -rf /var/lib/apt/lists/*
 
 # Install Go
 RUN curl -L -s https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz | tar -C /usr/local -xz
@@ -38,9 +35,6 @@ ENV PATH $PATH:/root/go/bin:/usr/local/go/bin
 # Install grpc compilers
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-# Install grpcio-tools (the version in 22.04 is too old)
-RUN pip install --user grpcio-tools
 
 COPY --chmod=644 custom-ca-certs/* /usr/local/share/ca-certificates/
 RUN update-ca-certificates
@@ -85,10 +79,16 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         espeak-ng \
         espeak \
+        python3-pip \
+        python-is-python3 \
         python3-dev \
         python3-venv && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --upgrade pip
+
+# Install grpcio-tools (the version in 22.04 is too old)
+RUN pip install --user grpcio-tools
 
 ###################################
 ###################################
@@ -107,7 +107,7 @@ ENV BUILD_TYPE=${BUILD_TYPE}
 RUN if [ "${BUILD_TYPE}" = "cublas" ]; then \
         apt-get update && \
         apt-get install -y  --no-install-recommends \
-            software-properties-common && \
+            software-properties-common pciutils && \
         curl -O https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
         dpkg -i cuda-keyring_1.1-1_all.deb && \
         rm -f cuda-keyring_1.1-1_all.deb && \
@@ -355,7 +355,7 @@ RUN mkdir -p /build/models
 # Define the health check command
 HEALTHCHECK --interval=1m --timeout=10m --retries=10 \
   CMD curl -f ${HEALTHCHECK_ENDPOINT} || exit 1
-  
+
 VOLUME /build/models
 EXPOSE 8080
 ENTRYPOINT [ "/build/entrypoint.sh" ]
