@@ -62,7 +62,7 @@ func Startup(opts ...config.AppOption) (*config.BackendConfigLoader, *model.Mode
 	//
 	pkgStartup.PreloadModelsConfigurations(options.ModelLibraryURL, options.ModelPath, options.ModelsURL...)
 
-	cl := config.NewBackendConfigLoader()
+	cl := config.NewBackendConfigLoader(options.ModelPath)
 	ml := model.NewModelLoader(options.ModelPath)
 
 	configLoaderOpts := options.ToConfigLoaderOptions()
@@ -82,13 +82,13 @@ func Startup(opts ...config.AppOption) (*config.BackendConfigLoader, *model.Mode
 	}
 
 	if options.PreloadJSONModels != "" {
-		if err := services.ApplyGalleryFromString(options.ModelPath, options.PreloadJSONModels, cl, options.Galleries); err != nil {
+		if err := services.ApplyGalleryFromString(options.ModelPath, options.PreloadJSONModels, options.Galleries); err != nil {
 			return nil, nil, nil, err
 		}
 	}
 
 	if options.PreloadModelsFromPath != "" {
-		if err := services.ApplyGalleryFromFile(options.ModelPath, options.PreloadModelsFromPath, cl, options.Galleries); err != nil {
+		if err := services.ApplyGalleryFromFile(options.ModelPath, options.PreloadModelsFromPath, options.Galleries); err != nil {
 			return nil, nil, nil, err
 		}
 	}
@@ -151,7 +151,7 @@ func Startup(opts ...config.AppOption) (*config.BackendConfigLoader, *model.Mode
 func createApplication(appConfig *config.ApplicationConfig) *core.Application {
 	app := &core.Application{
 		ApplicationConfig:   appConfig,
-		BackendConfigLoader: config.NewBackendConfigLoader(),
+		BackendConfigLoader: config.NewBackendConfigLoader(appConfig.ModelPath),
 		ModelLoader:         model.NewModelLoader(appConfig.ModelPath),
 	}
 
@@ -164,7 +164,7 @@ func createApplication(appConfig *config.ApplicationConfig) *core.Application {
 	// app.TextToSpeechBackendService = backend.NewTextToSpeechBackendService(app.ModelLoader, app.BackendConfigLoader, app.ApplicationConfig)
 
 	app.BackendMonitorService = services.NewBackendMonitorService(app.ModelLoader, app.BackendConfigLoader, app.ApplicationConfig)
-	app.GalleryService = services.NewGalleryService(app.ApplicationConfig.ModelPath)
+	app.GalleryService = services.NewGalleryService(app.ApplicationConfig)
 	app.ListModelsService = services.NewListModelsService(app.ModelLoader, app.BackendConfigLoader, app.ApplicationConfig)
 	// app.OpenAIService = services.NewOpenAIService(app.ModelLoader, app.BackendConfigLoader, app.ApplicationConfig, app.LLMBackendService)
 

@@ -37,7 +37,11 @@ const (
 	LLamaCPPAVX      = "llama-cpp-avx"
 	LLamaCPPFallback = "llama-cpp-fallback"
 	LLamaCPPCUDA     = "llama-cpp-cuda"
-	LLamaCPPGRPC     = "llama-cpp-grpc"
+	LLamaCPPHipblas  = "llama-cpp-hipblas"
+	LLamaCPPSycl16   = "llama-cpp-sycl_16"
+	LLamaCPPSycl32   = "llama-cpp-sycl_32"
+
+	LLamaCPPGRPC = "llama-cpp-grpc"
 
 	Gpt4AllLlamaBackend = "gpt4all-llama"
 	Gpt4AllMptBackend   = "gpt4all-mpt"
@@ -93,7 +97,7 @@ ENTRY:
 	if autoDetect {
 		// if we find the llama.cpp variants, show them of as a single backend (llama-cpp) as later we are going to pick that up
 		// when starting the service
-		foundLCPPAVX, foundLCPPAVX2, foundLCPPFallback, foundLCPPGRPC, foundLCPPCuda := false, false, false, false, false
+		foundLCPPAVX, foundLCPPAVX2, foundLCPPFallback, foundLCPPGRPC, foundLCPPCuda, foundLCPPHipblas, foundSycl16, foundSycl32 := false, false, false, false, false, false, false, false
 		if _, ok := backends[LLamaCPP]; !ok {
 			for _, e := range entry {
 				if strings.Contains(e.Name(), LLamaCPPAVX2) && !foundLCPPAVX2 {
@@ -115,6 +119,18 @@ ENTRY:
 				if strings.Contains(e.Name(), LLamaCPPCUDA) && !foundLCPPCuda {
 					backends[LLamaCPP] = append(backends[LLamaCPP], LLamaCPPCUDA)
 					foundLCPPCuda = true
+				}
+				if strings.Contains(e.Name(), LLamaCPPHipblas) && !foundLCPPHipblas {
+					backends[LLamaCPP] = append(backends[LLamaCPP], LLamaCPPHipblas)
+					foundLCPPHipblas = true
+				}
+				if strings.Contains(e.Name(), LLamaCPPSycl16) && !foundSycl16 {
+					backends[LLamaCPP] = append(backends[LLamaCPP], LLamaCPPSycl16)
+					foundSycl16 = true
+				}
+				if strings.Contains(e.Name(), LLamaCPPSycl32) && !foundSycl32 {
+					backends[LLamaCPP] = append(backends[LLamaCPP], LLamaCPPSycl32)
+					foundSycl32 = true
 				}
 			}
 		}
@@ -167,8 +183,10 @@ ENTRY:
 }
 
 // selectGRPCProcess selects the GRPC process to start based on system capabilities
-func selectGRPCProcess(backend, assetDir string) string {
+func selectGRPCProcess(backend, assetDir string, f16 bool) string {
 	foundCUDA := false
+	foundAMDGPU := false
+	foundIntelGPU := false
 	var grpcProcess string
 
 	// Select backend now just for llama.cpp
@@ -195,10 +213,34 @@ func selectGRPCProcess(backend, assetDir string) string {
 					log.Info().Msgf("GPU device found but no CUDA backend present")
 				}
 			}
+			if strings.Contains(gpu.String(), "amd") {
+				p := backendPath(assetDir, LLamaCPPHipblas)
+				if _, err := os.Stat(p); err == nil {
+					log.Info().Msgf("[%s] attempting to load with HIPBLAS variant", backend)
+					grpcProcess = p
+					foundAMDGPU = true
+				} else {
+					log.Info().Msgf("GPU device found but no HIPBLAS backend present")
+				}
+			}
+			if strings.Contains(gpu.String(), "intel") {
+				backend := LLamaCPPSycl16
+				if !f16 {
+					backend = LLamaCPPSycl32
+				}
+				p := backendPath(assetDir, backend)
+				if _, err := os.Stat(p); err == nil {
+					log.Info().Msgf("[%s] attempting to load with Intel variant", backend)
+					grpcProcess = p
+					foundIntelGPU = true
+				} else {
+					log.Info().Msgf("GPU device found but no Intel backend present")
+				}
+			}
 		}
 	}
 
-	if foundCUDA {
+	if foundCUDA || foundAMDGPU || foundIntelGPU {
 		return grpcProcess
 	}
 
@@ -220,6 +262,7 @@ func selectGRPCProcess(backend, assetDir string) string {
 // It also loads the model
 func (ml *ModelLoader) grpcModel(backend string, o *Options) func(string, string) (ModelAddress, error) {
 	return func(modelName, modelFile string) (ModelAddress, error) {
+
 		log.Debug().Msgf("Loading Model %s with gRPC (file: %s) (backend: %s): %+v", modelName, modelFile, backend, *o)
 
 		var client ModelAddress
@@ -268,7 +311,7 @@ func (ml *ModelLoader) grpcModel(backend string, o *Options) func(string, string
 
 			if autoDetect {
 				// autoDetect GRPC process to start based on system capabilities
-				if selectedProcess := selectGRPCProcess(backend, o.assetDir); selectedProcess != "" {
+				if selectedProcess := selectGRPCProcess(backend, o.assetDir, o.gRPCOptions.F16Memory); selectedProcess != "" {
 					grpcProcess = selectedProcess
 				}
 			}
@@ -450,10 +493,10 @@ func (ml *ModelLoader) GreedyLoader(opts ...Option) (grpc.Backend, error) {
 			log.Info().Msgf("[%s] Loads OK", key)
 			return model, nil
 		} else if modelerr != nil {
-			err = errors.Join(err, modelerr)
+			err = errors.Join(err, fmt.Errorf("[%s]: %w", key, modelerr))
 			log.Info().Msgf("[%s] Fails: %s", key, modelerr.Error())
 		} else if model == nil {
-			err = errors.Join(err, fmt.Errorf("backend returned no usable model"))
+			err = errors.Join(err, fmt.Errorf("backend %s returned no usable model", key))
 			log.Info().Msgf("[%s] Fails: %s", key, "backend returned no usable model")
 		}
 	}

@@ -129,6 +129,15 @@ func updateRequestConfig(config *config.BackendConfig, input *schema.OpenAIReque
 		config.Maxtokens = input.Maxtokens
 	}
 
+	if input.ResponseFormat != nil {
+		switch responseFormat := input.ResponseFormat.(type) {
+		case string:
+			config.ResponseFormat = responseFormat
+		case map[string]interface{}:
+			config.ResponseFormatMap = responseFormat
+		}
+	}
+
 	switch stop := input.Stop.(type) {
 	case string:
 		if stop != "" {
@@ -280,6 +289,7 @@ func mergeRequestWithConfig(modelFile string, input *schema.OpenAIRequest, cm *c
 		config.LoadOptionThreads(threads),
 		config.LoadOptionContextSize(ctx),
 		config.LoadOptionF16(f16),
+		config.ModelPath(loader.ModelPath),
 	)
 
 	// Set the parameters for the language model prediction

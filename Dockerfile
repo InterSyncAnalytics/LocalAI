@@ -8,7 +8,7 @@ FROM ${BASE_IMAGE} AS requirements-core
 
 USER root
 
-ARG GO_VERSION=1.21.7
+ARG GO_VERSION=1.22.4
 ARG TARGETARCH
 ARG TARGETVARIANT
 
@@ -33,8 +33,8 @@ RUN curl -L -s https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz | ta
 ENV PATH $PATH:/root/go/bin:/usr/local/go/bin
 
 # Install grpc compilers
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
-    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1 && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@1958fcbe2ca8bd93af633f11e97d44e567e945af
 
 COPY --chmod=644 custom-ca-certs/* /usr/local/share/ca-certificates/
 RUN update-ca-certificates
@@ -99,11 +99,37 @@ FROM requirements-${IMAGE_TYPE} AS requirements-drivers
 
 ARG BUILD_TYPE
 ARG CUDA_MAJOR_VERSION=11
-ARG CUDA_MINOR_VERSION=7
+ARG CUDA_MINOR_VERSION=8
 
 ENV BUILD_TYPE=${BUILD_TYPE}
 
 # CuBLAS requirements
+RUN <<EOT bash
+    if [ "${BUILD_TYPE}" = "cublas" ]; then
+        apt-get update && \
+        apt-get install -y  --no-install-recommends \
+                        software-properties-common pciutils
+        if [ "amd64" = "$TARGETARCH" ]; then
+            curl -O https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+            fi
+        if [ "arm64" = "$TARGETARCH" ]; then
+            curl -O https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/arm64/cuda-keyring_1.1-1_all.deb
+        fi
+        dpkg -i cuda-keyring_1.1-1_all.deb && \
+            rm -f cuda-keyring_1.1-1_all.deb && \
+            apt-get update && \
+            apt-get install -y --no-install-recommends \
+                cuda-nvcc-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} \
+                libcufft-dev-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} \
+                libcurand-dev-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} \
+                libcublas-dev-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} \
+                libcusparse-dev-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} \
+                libcusolver-dev-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} && \
+            apt-get clean && \
+        rm -rf /var/lib/apt/lists/*
+    fi
+EOT
+
 RUN if [ "${BUILD_TYPE}" = "cublas" ]; then \
         apt-get update && \
         apt-get install -y  --no-install-recommends \
@@ -114,6 +140,7 @@ RUN if [ "${BUILD_TYPE}" = "cublas" ]; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
             cuda-nvcc-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} \
+            libcufft-dev-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} \
             libcurand-dev-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} \
             libcublas-dev-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} \
             libcusparse-dev-${CUDA_MAJOR_VERSION}-${CUDA_MINOR_VERSION} \
@@ -163,7 +190,7 @@ FROM ${GRPC_BASE_IMAGE} AS grpc
 
 # This is a bit of a hack, but it's required in order to be able to effectively cache this layer in CI
 ARG GRPC_MAKEFLAGS="-j4 -Otarget"
-ARG GRPC_VERSION=v1.58.0
+ARG GRPC_VERSION=v1.64.2
 
 ENV MAKEFLAGS=${GRPC_MAKEFLAGS}
 
@@ -218,9 +245,18 @@ RUN make prepare
 # We need protoc installed, and the version in 22.04 is too old.  We will create one as part installing the GRPC build below
 # but that will also being in a newer version of absl which stablediffusion cannot compile with.  This version of protoc is only
 # here so that we can generate the grpc code for the stablediffusion build
-RUN curl -L -s https://github.com/protocolbuffers/protobuf/releases/download/v26.1/protoc-26.1-linux-x86_64.zip -o protoc.zip && \
-    unzip -j -d /usr/local/bin protoc.zip bin/protoc && \
-    rm protoc.zip
+RUN <<EOT bash
+    if [ "amd64" = "$TARGETARCH" ]; then
+        curl -L -s https://github.com/protocolbuffers/protobuf/releases/download/v27.1/protoc-27.1-linux-x86_64.zip -o protoc.zip && \
+        unzip -j -d /usr/local/bin protoc.zip bin/protoc && \
+        rm protoc.zip
+    fi
+    if [ "arm64" = "$TARGETARCH" ]; then
+        curl -L -s https://github.com/protocolbuffers/protobuf/releases/download/v27.1/protoc-27.1-linux-aarch_64.zip -o protoc.zip && \
+        unzip -j -d /usr/local/bin protoc.zip bin/protoc && \
+        rm protoc.zip
+    fi
+EOT
 
 # stablediffusion does not tolerate a newer version of abseil, build it first
 RUN GRPC_BACKENDS=backend-assets/grpc/stablediffusion make build

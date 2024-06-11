@@ -93,8 +93,8 @@ jobs:
           sudo apt-get install -y cuda-nvcc-${CUDA_VERSION} libcublas-dev-${CUDA_VERSION}
           export CUDACXX=/usr/local/cuda/bin/nvcc
 
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.0
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@8ba23be9613c672d40ae261d2a1335d639bdd59b
 
           # The python3-grpc-tools package in 22.04 is too old
           pip install --user grpcio-tools
@@ -178,7 +178,7 @@ jobs:
           submodules: true
       - name: Build images
         run: |
-          docker build --build-arg FFMPEG=true --build-arg IMAGE_TYPE=core --build-arg MAKEFLAGS="--jobs=5 --output-sync=target" -t local-ai:tests -f Dockerfile .
+          docker build --build-arg FFMPEG=true --build-arg IMAGE_TYPE=extras --build-arg EXTRA_BACKENDS=rerankers --build-arg MAKEFLAGS="--jobs=5 --output-sync=target" -t local-ai:tests -f Dockerfile .
           BASE_IMAGE=local-ai:tests DOCKER_AIO_IMAGE=local-ai-aio:test make docker-aio
       - name: Test
         run: |

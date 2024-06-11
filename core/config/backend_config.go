@@ -15,6 +15,15 @@ const (
 	RAND_SEED = -1
 )
 
+type TTSConfig struct {
+
+	// Voice wav path or id
+	Voice string `yaml:"voice"`
+
+	// Vall-e-x
+	VallE VallE `yaml:"vall-e"`
+}
+
 type BackendConfig struct {
 	schema.PredictionOptions `yaml:"parameters"`
 	Name                     string `yaml:"name"`
@@ -27,9 +36,11 @@ type BackendConfig struct {
 	Backend        string            `yaml:"backend"`
 	TemplateConfig TemplateConfig    `yaml:"template"`
 
-	PromptStrings, InputStrings                []string `yaml:"-"`
-	InputToken                                 [][]int  `yaml:"-"`
-	functionCallString, functionCallNameString string   `yaml:"-"`
+	PromptStrings, InputStrings                []string               `yaml:"-"`
+	InputToken                                 [][]int                `yaml:"-"`
+	functionCallString, functionCallNameString string                 `yaml:"-"`
+	ResponseFormat                             string                 `yaml:"-"`
+	ResponseFormatMap                          map[string]interface{} `yaml:"-"`
 
 	FunctionsConfig functions.FunctionsConfig `yaml:"function"`
 
@@ -47,8 +58,8 @@ type BackendConfig struct {
 	// GRPC Options
 	GRPC GRPC `yaml:"grpc"`
 
-	// Vall-e-x
-	VallE VallE `yaml:"vall-e"`
+	// TTS specifics
+	TTSConfig `yaml:"tts"`
 
 	// CUDA
 	// Explicitly enable CUDA or not (some backends might need it)
@@ -357,6 +368,8 @@ func (cfg *BackendConfig) SetDefaults(opts ...ConfigLoaderOption) {
 	if debug {
 		cfg.Debug = &trueV
 	}
+
+	guessDefaultsFromFile(cfg, lo.modelPath)
 }
 
 func (c *BackendConfig) Validate() bool {
@@ -388,4 +401,8 @@ func (c *BackendConfig) Validate() bool {
 	}
 
 	return true
+}
+
+func (c *BackendConfig) HasTemplate() bool {
+	return c.TemplateConfig.Completion != "" || c.TemplateConfig.Edit != "" || c.TemplateConfig.Chat != "" || c.TemplateConfig.ChatMessage != ""
 }

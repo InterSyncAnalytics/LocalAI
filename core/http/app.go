@@ -20,6 +20,7 @@ import (
 	"github.com/gofiber/contrib/fiberzerolog"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/csrf"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/recover"
@@ -65,15 +66,19 @@ var embedDirStatic embed.FS
 // @name Authorization
 
 func App(cl *config.BackendConfigLoader, ml *model.ModelLoader, appConfig *config.ApplicationConfig) (*fiber.App, error) {
-	// Return errors as JSON responses
-	app := fiber.New(fiber.Config{
+
+	fiberCfg := fiber.Config{
 		Views:     renderEngine(),
 		BodyLimit: appConfig.UploadLimitMB * 1024 * 1024, // this is the default limit of 4MB
 		// We disable the Fiber startup message as it does not conform to structured logging.
 		// We register a startup log line with connection information in the OnListen hook to keep things user friendly though
 		DisableStartupMessage: true,
 		// Override default error handler
-		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
+	}
+
+	if !appConfig.OpaqueErrors {
+		// Normally, return errors as JSON responses
+		fiberCfg.ErrorHandler = func(ctx *fiber.Ctx, err error) error {
 			// Status code defaults to 500
 			code := fiber.StatusInternalServerError
 
@@ -89,8 +94,15 @@ func App(cl *config.BackendConfigLoader, ml *model.ModelLoader, appConfig *confi
 					Error: &schema.APIError{Message: err.Error(), Code: code},
 				},
 			)
-		},
-	})
+		}
+	} else {
+		// If OpaqueErrors are required, replace everything with a blank 500.
+		fiberCfg.ErrorHandler = func(ctx *fiber.Ctx, _ error) error {
+			return ctx.Status(500).SendString("")
+		}
+	}
+
+	app := fiber.New(fiberCfg)
 
 	app.Hooks().OnListen(func(listenData fiber.ListenData) error {
 		scheme := "http"
@@ -167,12 +179,17 @@ func App(cl *config.BackendConfigLoader, ml *model.ModelLoader, appConfig *confi
 		app.Use(c)
 	}
 
+	if appConfig.CSRF {
+		log.Debug().Msg("Enabling CSRF middleware. Tokens are now required for state-modifying requests")
+		app.Use(csrf.New())
+	}
+
 	// Load config jsons
 	utils.LoadConfig(appConfig.UploadDir, openai.UploadedFilesFile, &openai.UploadedFiles)
 	utils.LoadConfig(appConfig.ConfigsDir, openai.AssistantsConfigFile, &openai.Assistants)
 	utils.LoadConfig(appConfig.ConfigsDir, openai.AssistantsFileConfigFile, &openai.AssistantFiles)
 
-	galleryService := services.NewGalleryService(appConfig.ModelPath)
+	galleryService := services.NewGalleryService(appConfig)
 	galleryService.Start(appConfig.Context, cl)
 
 	routes.RegisterElevenLabsRoutes(app, cl, ml, appConfig, auth)

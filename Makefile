@@ -5,7 +5,7 @@ BINARY_NAME=local-ai
 
 # llama.cpp versions
 GOLLAMA_STABLE_VERSION?=2b57a8ae43e4699d3dc5d1496a1ccd42922993be
-CPPLLAMA_VERSION?=10b1e4587670feba2c7730a645accf8234873113
+CPPLLAMA_VERSION?=fd5ea0f897ecb3659d6c269ef6f3d833e865ead7
 
 # gpt4all version
 GPT4ALL_REPO?=https://github.com/nomic-ai/gpt4all
@@ -16,7 +16,7 @@ RWKV_REPO?=https://github.com/donomii/go-rwkv.cpp
 RWKV_VERSION?=661e7ae26d442f5cfebd2a0881b44e8c55949ec6
 
 # whisper.cpp version
-WHISPER_CPP_VERSION?=c7b6988678779901d02ceba1a8212d2c9908956e
+WHISPER_CPP_VERSION?=20c542c71334b3e6c422789093a19157b110ca81
 
 # bert.cpp version
 BERT_VERSION?=710044b124545415f555e4260d16b146c725a6e4
@@ -100,7 +100,7 @@ ifeq ($(BUILD_TYPE),cublas)
 	CGO_LDFLAGS+=-lcublas -lcudart -L$(CUDA_LIBPATH)
 	export LLAMA_CUBLAS=1
 	export WHISPER_CUDA=1
-	CGO_LDFLAGS_WHISPER+=-L$(CUDA_LIBPATH)/stubs/ -lcuda
+	CGO_LDFLAGS_WHISPER+=-L$(CUDA_LIBPATH)/stubs/ -lcuda -lcufft
 endif
 
 ifeq ($(BUILD_TYPE),hipblas)
@@ -324,9 +324,12 @@ build-api:
 dist:
 	STATIC=true $(MAKE) backend-assets/grpc/llama-cpp-avx2
 ifeq ($(OS),Darwin)
-	$(info ${GREEN}I Skip CUDA build on MacOS${RESET})
+	$(info ${GREEN}I Skip CUDA/hipblas build on MacOS${RESET})
 else
 	$(MAKE) backend-assets/grpc/llama-cpp-cuda
+	$(MAKE) backend-assets/grpc/llama-cpp-hipblas
+	$(MAKE) backend-assets/grpc/llama-cpp-sycl_f16
+	$(MAKE) backend-assets/grpc/llama-cpp-sycl_f32
 endif
 	$(MAKE) build
 	mkdir -p release
@@ -337,6 +340,19 @@ ifeq ($(BUILD_ID),)
 else
 	cp $(BINARY_NAME) release/$(BINARY_NAME)-$(BUILD_ID)-$(OS)-$(ARCH)
 	shasum -a 256 release/$(BINARY_NAME)-$(BUILD_ID)-$(OS)-$(ARCH) > release/$(BINARY_NAME)-$(BUILD_ID)-$(OS)-$(ARCH).sha256
+endif
+
+dist-cross-linux-arm64: 
+	CMAKE_ARGS="$(CMAKE_ARGS) -DLLAMA_NATIVE=off" GRPC_BACKENDS="backend-assets/grpc/llama-cpp-fallback backend-assets/grpc/llama-cpp-grpc backend-assets/util/llama-cpp-rpc-server" \
+	$(MAKE) build
+	mkdir -p release
+# if BUILD_ID is empty, then we don't append it to the binary name
+ifeq ($(BUILD_ID),)
+	cp $(BINARY_NAME) release/$(BINARY_NAME)-$(OS)-arm64
+	shasum -a 256 release/$(BINARY_NAME)-$(OS)-arm64 > release/$(BINARY_NAME)-$(OS)-arm64.sha256
+else
+	cp $(BINARY_NAME) release/$(BINARY_NAME)-$(BUILD_ID)-$(OS)-arm64
+	shasum -a 256 release/$(BINARY_NAME)-$(BUILD_ID)-$(OS)-arm64 > release/$(BINARY_NAME)-$(BUILD_ID)-$(OS)-arm64.sha256
 endif
 
 osx-signed: build
@@ -447,7 +463,7 @@ protogen-clean: protogen-go-clean protogen-python-clean
 .PHONY: protogen-go
 protogen-go:
 	mkdir -p pkg/grpc/proto
-	protoc -Ibackend/ --go_out=pkg/grpc/proto/ --go_opt=paths=source_relative --go-grpc_out=pkg/grpc/proto/ --go-grpc_opt=paths=source_relative \
+	protoc --experimental_allow_proto3_optional -Ibackend/ --go_out=pkg/grpc/proto/ --go_opt=paths=source_relative --go-grpc_out=pkg/grpc/proto/ --go-grpc_opt=paths=source_relative \
     backend/backend.proto
 
 .PHONY: protogen-go-clean
@@ -672,6 +688,14 @@ else
 	LLAMA_VERSION=$(CPPLLAMA_VERSION) $(MAKE) -C backend/cpp/${VARIANT} grpc-server
 endif
 
+# This target is for manually building a variant with-auto detected flags
+backend-assets/grpc/llama-cpp: backend-assets/grpc
+	cp -rf backend/cpp/llama backend/cpp/llama-cpp
+	$(MAKE) -C backend/cpp/llama-cpp purge
+	$(info ${GREEN}I llama-cpp build info:avx2${RESET})
+	$(MAKE) VARIANT="llama-cpp" build-llama-cpp-grpc-server
+	cp -rfv backend/cpp/llama-cpp/grpc-server backend-assets/grpc/llama-cpp
+
 backend-assets/grpc/llama-cpp-avx2: backend-assets/grpc
 	cp -rf backend/cpp/llama backend/cpp/llama-avx2
 	$(MAKE) -C backend/cpp/llama-avx2 purge
@@ -703,6 +727,27 @@ backend-assets/grpc/llama-cpp-cuda: backend-assets/grpc
 	$(info ${GREEN}I llama-cpp build info:cuda${RESET})
 	CMAKE_ARGS="$(CMAKE_ARGS) -DLLAMA_AVX=on -DLLAMA_AVX2=off -DLLAMA_AVX512=off -DLLAMA_FMA=off -DLLAMA_F16C=off -DLLAMA_CUDA=ON" $(MAKE) VARIANT="llama-cuda" build-llama-cpp-grpc-server
 	cp -rfv backend/cpp/llama-cuda/grpc-server backend-assets/grpc/llama-cpp-cuda
+
+backend-assets/grpc/llama-cpp-hipblas: backend-assets/grpc
+	cp -rf backend/cpp/llama backend/cpp/llama-hipblas
+	$(MAKE) -C backend/cpp/llama-hipblas purge
+	$(info ${GREEN}I llama-cpp build info:hipblas${RESET})
+	BUILD_TYPE="hipblas" $(MAKE) VARIANT="llama-hipblas" build-llama-cpp-grpc-server
+	cp -rfv backend/cpp/llama-hipblas/grpc-server backend-assets/grpc/llama-cpp-hipblas
+
+backend-assets/grpc/llama-cpp-sycl_f16: backend-assets/grpc
+	cp -rf backend/cpp/llama backend/cpp/llama-sycl_f16
+	$(MAKE) -C backend/cpp/llama-sycl_f16 purge
+	$(info ${GREEN}I llama-cpp build info:sycl_f16${RESET})
+	BUILD_TYPE="sycl_f16" $(MAKE) VARIANT="llama-sycl_f16" build-llama-cpp-grpc-server
+	cp -rfv backend/cpp/llama-sycl_f16/grpc-server backend-assets/grpc/llama-cpp-sycl_f16
+
+backend-assets/grpc/llama-cpp-sycl_f32: backend-assets/grpc
+	cp -rf backend/cpp/llama backend/cpp/llama-sycl_f32
+	$(MAKE) -C backend/cpp/llama-sycl_f32 purge
+	$(info ${GREEN}I llama-cpp build info:sycl_f32${RESET})
+	BUILD_TYPE="sycl_f32" $(MAKE) VARIANT="llama-sycl_f32" build-llama-cpp-grpc-server
+	cp -rfv backend/cpp/llama-sycl_f32/grpc-server backend-assets/grpc/llama-cpp-sycl_f32
 
 backend-assets/grpc/llama-cpp-grpc: backend-assets/grpc
 	cp -rf backend/cpp/llama backend/cpp/llama-grpc

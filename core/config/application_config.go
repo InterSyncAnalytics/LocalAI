@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-skynet/LocalAI/pkg/gallery"
+	"github.com/go-skynet/LocalAI/pkg/xsysinfo"
 	"github.com/rs/zerolog/log"
 )
 
@@ -25,10 +26,12 @@ type ApplicationConfig struct {
 	DynamicConfigsDir                   string
 	DynamicConfigsDirPollInterval       time.Duration
 	CORS                                bool
+	CSRF                                bool
 	PreloadJSONModels                   string
 	PreloadModelsFromPath               string
 	CORSAllowOrigins                    string
 	ApiKeys                             []string
+	OpaqueErrors                        bool
 
 	ModelLibraryURL string
 
@@ -59,7 +62,6 @@ func NewApplicationConfig(o ...AppOption) *ApplicationConfig {
 	opt := &ApplicationConfig{
 		Context:       context.Background(),
 		UploadLimitMB: 15,
-		Threads:       1,
 		ContextSize:   512,
 		Debug:         true,
 	}
@@ -84,6 +86,12 @@ func WithModelPath(path string) AppOption {
 func WithCors(b bool) AppOption {
 	return func(o *ApplicationConfig) {
 		o.CORS = b
+	}
+}
+
+func WithCsrf(b bool) AppOption {
+	return func(o *ApplicationConfig) {
+		o.CSRF = b
 	}
 }
 
@@ -213,6 +221,9 @@ func WithUploadLimitMB(limit int) AppOption {
 
 func WithThreads(threads int) AppOption {
 	return func(o *ApplicationConfig) {
+		if threads == 0 { // 0 is not allowed
+			threads = xsysinfo.CPUPhysicalCores()
+		}
 		o.Threads = threads
 	}
 }
@@ -277,6 +288,12 @@ func WithApiKeys(apiKeys []string) AppOption {
 	}
 }
 
+func WithOpaqueErrors(opaque bool) AppOption {
+	return func(o *ApplicationConfig) {
+		o.OpaqueErrors = opaque
+	}
+}
+
 // ToConfigLoaderOptions returns a slice of ConfigLoader Option.
 // Some options defined at the application level are going to be passed as defaults for
 // all the configuration for the models.
@@ -289,6 +306,7 @@ func (o *ApplicationConfig) ToConfigLoaderOptions() []ConfigLoaderOption {
 		LoadOptionDebug(o.Debug),
 		LoadOptionF16(o.F16),
 		LoadOptionThreads(o.Threads),
+		ModelPath(o.ModelPath),
 	}
 }
 

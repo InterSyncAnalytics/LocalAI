@@ -109,6 +109,7 @@ Build and deploy custom containers:
 WebUIs:
 - https://github.com/Jirubizu/localai-admin
 - https://github.com/go-skynet/LocalAI-frontend
+- QA-Pilot(An interactive chat project that leverages LocalAI LLMs for rapid understanding and navigation of GitHub code repository) https://github.com/reid41/QA-Pilot
 
 Model galleries
 - https://github.com/go-skynet/model-gallery
@@ -121,13 +122,14 @@ Other:
 - Home Assistant https://github.com/sammcj/homeassistant-localai / https://github.com/drndos/hass-openai-custom-conversation / https://github.com/valentinfrlch/ha-gpt4vision
 - Discord bot https://github.com/mudler/LocalAGI/tree/main/examples/discord
 - Slack bot https://github.com/mudler/LocalAGI/tree/main/examples/slack
+- Shell-Pilot(Interact with LLM using LocalAI models via pure shell scripts on your Linux or MacOS system) https://github.com/reid41/shell-pilot
 - Telegram bot https://github.com/mudler/LocalAI/tree/master/examples/telegram-bot
 - Examples: https://github.com/mudler/LocalAI/tree/master/examples/
   
 
 ### 🔗 Resources
 
-- 🆕 New! [LLM finetuning guide](https://localai.io/docs/advanced/fine-tuning/)
+- [LLM finetuning guide](https://localai.io/docs/advanced/fine-tuning/)
 - [How to build locally](https://localai.io/basics/build/index.html)
 - [How to install in Kubernetes](https://localai.io/basics/getting_started/index.html#run-localai-in-kubernetes)
 - [Projects integrating LocalAI](https://localai.io/docs/integrations/)
@@ -135,6 +137,7 @@ Other:
 
 ## :book: 🎥 [Media, Blogs, Social](https://localai.io/basics/news/#media-blogs-social)
 
+- 🆕 [Run LocalAI on Jetson Nano Devkit](https://mudler.pm/posts/local-ai-jetson-nano-devkit/)
 - [Run LocalAI on AWS EKS with Pulumi](https://www.pulumi.com/blog/low-code-llm-apps-with-local-ai-flowise-and-pulumi/)
 - [Run LocalAI on AWS](https://staleks.hashnode.dev/installing-localai-on-aws-ec2-instance)
 - [Create a slackbot for teams and OSS projects that answer to documentation](https://mudler.pm/posts/smart-slackbot-for-teams/)
@@ -162,17 +165,16 @@ If you utilize this repository, data in a downstream project, please consider ci
 
 Support the project by becoming [a backer or sponsor](https://github.com/sponsors/mudler). Your logo will show up here with a link to your website.
 
-A huge thank you to our generous sponsors who support this project:
+A huge thank you to our generous sponsors who support this project covering CI expenses, and our [Sponsor list](https://github.com/sponsors/mudler):
 
-| ![Spectro Cloud logo_600x600px_transparent bg](https://github.com/go-skynet/LocalAI/assets/2420543/68a6f3cb-8a65-4a4d-99b5-6417a8905512) |
-|:-----------------------------------------------:|
-|  [Spectro Cloud](https://www.spectrocloud.com/)  |
-|  Spectro Cloud kindly supports LocalAI by providing GPU and computing resources to run tests on lamdalabs!  |
-
-And a huge shout-out to individuals sponsoring the project by donating hardware or backing the project.
-
-- [Sponsor list](https://github.com/sponsors/mudler)
-- JDAM00 (donating HW for the CI)
+<p align="center">
+  <a href="https://www.spectrocloud.com/" target="blank">
+    <img height="200" src="https://github.com/go-skynet/LocalAI/assets/2420543/68a6f3cb-8a65-4a4d-99b5-6417a8905512">
+  </a>
+  <a href="https://www.premai.io/" target="blank">
+    <img height="200" src="https://github.com/mudler/LocalAI/assets/2420543/42e4ca83-661e-4f79-8e46-ae43689683d6"> <br>
+  </a>
+</p>
 
 ## 🌟 Star history
 
@@ -182,7 +184,7 @@ And a huge shout-out to individuals sponsoring the project by donating hardware 
 
 LocalAI is a community-driven project created by [Ettore Di Giacinto](https://github.com/mudler/).
 
-MIT - Author Ettore Di Giacinto
+MIT - Author Ettore Di Giacinto <mudler@localai.io>
 
 ## 🙇 Acknowledgements
 

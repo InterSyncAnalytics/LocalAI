@@ -73,7 +73,8 @@ func getModelStatus(url string) (response map[string]interface{}) {
 }
 
 func getModels(url string) (response []gallery.GalleryModel) {
-	downloader.GetURI(url, func(url string, i []byte) error {
+	// TODO: No tests currently seem to exercise file:// urls. Fix?
+	downloader.GetURI(url, "", func(url string, i []byte) error {
 		// Unmarshal YAML data into a struct
 		return json.Unmarshal(i, &response)
 	})
@@ -221,6 +222,8 @@ var _ = Describe("API test", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			modelDir = filepath.Join(tmpdir, "models")
+			err = os.Mkdir(modelDir, 0750)
+			Expect(err).ToNot(HaveOccurred())
 			backendAssetsDir := filepath.Join(tmpdir, "backend-assets")
 			err = os.Mkdir(backendAssetsDir, 0750)
 			Expect(err).ToNot(HaveOccurred())
@@ -241,13 +244,13 @@ var _ = Describe("API test", func() {
 			}
 			out, err := yaml.Marshal(g)
 			Expect(err).ToNot(HaveOccurred())
-			err = os.WriteFile(filepath.Join(tmpdir, "gallery_simple.yaml"), out, 0600)
+			err = os.WriteFile(filepath.Join(modelDir, "gallery_simple.yaml"), out, 0600)
 			Expect(err).ToNot(HaveOccurred())
 
 			galleries := []gallery.Gallery{
 				{
 					Name: "test",
-					URL:  "file://" + filepath.Join(tmpdir, "gallery_simple.yaml"),
+					URL:  "file://" + filepath.Join(modelDir, "gallery_simple.yaml"),
 				},
 			}
 
