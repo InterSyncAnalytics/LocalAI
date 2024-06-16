@@ -16,6 +16,8 @@
 
   function:
     disable_no_action: true
+    return_name_in_function_response: true
+
 
   template:
     join_chat_messages_by_character: ""
