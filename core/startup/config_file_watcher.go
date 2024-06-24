@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/go-skynet/LocalAI/core/config"
 	"github.com/imdario/mergo"
+	"github.com/mudler/LocalAI/core/config"
 	"github.com/rs/zerolog/log"
 )
 
@@ -116,7 +116,7 @@ func (c *configFileHandler) Watch() error {
 	// Add a path.
 	err = c.watcher.Add(c.appConfig.DynamicConfigsDir)
 	if err != nil {
-		return fmt.Errorf("unable to establish watch on the LocalAI Configuration Directory: %+v", err)
+		return fmt.Errorf("unable to create a watcher on the configuration directory: %+v", err)
 	}
 
 	return nil

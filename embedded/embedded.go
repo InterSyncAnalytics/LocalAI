@@ -6,10 +6,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/go-skynet/LocalAI/pkg/downloader"
+	"github.com/mudler/LocalAI/pkg/downloader"
 	"github.com/rs/zerolog/log"
 
-	"github.com/go-skynet/LocalAI/pkg/assets"
+	"github.com/mudler/LocalAI/pkg/assets"
 	"gopkg.in/yaml.v3"
 )
 
@@ -39,7 +39,7 @@ func init() {
 func GetRemoteLibraryShorteners(url string, basePath string) (map[string]string, error) {
 	remoteLibrary := map[string]string{}
 
-	err := downloader.GetURI(url, basePath, func(_ string, i []byte) error {
+	err := downloader.DownloadAndUnmarshal(url, basePath, func(_ string, i []byte) error {
 		return yaml.Unmarshal(i, &remoteLibrary)
 	})
 	if err != nil {

@@ -13,15 +13,15 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/go-skynet/LocalAI/core/config"
-	. "github.com/go-skynet/LocalAI/core/http"
-	"github.com/go-skynet/LocalAI/core/schema"
-	"github.com/go-skynet/LocalAI/core/startup"
+	"github.com/mudler/LocalAI/core/config"
+	. "github.com/mudler/LocalAI/core/http"
+	"github.com/mudler/LocalAI/core/schema"
+	"github.com/mudler/LocalAI/core/startup"
 
-	"github.com/go-skynet/LocalAI/pkg/downloader"
-	"github.com/go-skynet/LocalAI/pkg/gallery"
-	"github.com/go-skynet/LocalAI/pkg/model"
 	"github.com/gofiber/fiber/v2"
+	"github.com/mudler/LocalAI/pkg/downloader"
+	"github.com/mudler/LocalAI/pkg/gallery"
+	"github.com/mudler/LocalAI/pkg/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
@@ -74,7 +74,7 @@ func getModelStatus(url string) (response map[string]interface{}) {
 
 func getModels(url string) (response []gallery.GalleryModel) {
 	// TODO: No tests currently seem to exercise file:// urls. Fix?
-	downloader.GetURI(url, "", func(url string, i []byte) error {
+	downloader.DownloadAndUnmarshal(url, "", func(url string, i []byte) error {
 		// Unmarshal YAML data into a struct
 		return json.Unmarshal(i, &response)
 	})

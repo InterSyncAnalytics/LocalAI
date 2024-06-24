@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/go-skynet/LocalAI/embedded"
-	"github.com/go-skynet/LocalAI/pkg/downloader"
-	"github.com/go-skynet/LocalAI/pkg/gallery"
-	"github.com/go-skynet/LocalAI/pkg/utils"
+	"github.com/mudler/LocalAI/embedded"
+	"github.com/mudler/LocalAI/pkg/downloader"
+	"github.com/mudler/LocalAI/pkg/gallery"
+	"github.com/mudler/LocalAI/pkg/utils"
 	"github.com/rs/zerolog/log"
 )
 
@@ -52,6 +53,28 @@ func InstallModels(galleries []gallery.Gallery, modelLibraryURL string, modelPat
 				log.Error().Err(e).Str("filepath", modelDefinitionFilePath).Msg("error writing model definition")
 				err = errors.Join(err, e)
 			}
+		case downloader.LooksLikeOCI(url):
+			log.Debug().Msgf("[startup] resolved OCI model to download: %s", url)
+
+			// convert OCI image name to a file name.
+			ociName := strings.TrimPrefix(url, downloader.OCIPrefix)
+			ociName = strings.TrimPrefix(ociName, downloader.OllamaPrefix)
+			ociName = strings.ReplaceAll(ociName, "/", "__")
+			ociName = strings.ReplaceAll(ociName, ":", "__")
+
+			// check if file exists
+			if _, e := os.Stat(filepath.Join(modelPath, ociName)); errors.Is(e, os.ErrNotExist) {
+				modelDefinitionFilePath := filepath.Join(modelPath, ociName)
+				e := downloader.DownloadFile(url, modelDefinitionFilePath, "", 0, 0, func(fileName, current, total string, percent float64) {
+					utils.DisplayDownloadFunction(fileName, current, total, percent)
+				})
+				if e != nil {
+					log.Error().Err(e).Str("url", url).Str("filepath", modelDefinitionFilePath).Msg("error downloading model")
+					err = errors.Join(err, e)
+				}
+			}
+
+			log.Info().Msgf("[startup] installed model from OCI repository: %s", ociName)
 		case downloader.LooksLikeURL(url):
 			log.Debug().Msgf("[startup] resolved model to download: %s", url)
 

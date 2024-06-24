@@ -5,8 +5,9 @@ import (
 	"os"
 	"syscall"
 
-	cliContext "github.com/go-skynet/LocalAI/core/cli/context"
-	"github.com/go-skynet/LocalAI/pkg/assets"
+	cliContext "github.com/mudler/LocalAI/core/cli/context"
+	"github.com/mudler/LocalAI/pkg/assets"
+	"github.com/mudler/LocalAI/pkg/library"
 	"github.com/rs/zerolog/log"
 )
 
@@ -27,17 +28,18 @@ func (r *LLamaCPP) Run(ctx *cliContext.Context) error {
 		return fmt.Errorf("usage: local-ai worker llama-cpp-rpc -- <llama-rpc-server-args>")
 	}
 
+	grpcProcess := assets.ResolvePath(
+		r.BackendAssetsPath,
+		"util",
+		"llama-cpp-rpc-server",
+	)
+
+	args := os.Args[4:]
+	args, grpcProcess = library.LoadLDSO(r.BackendAssetsPath, args, grpcProcess)
+
+	args = append([]string{grpcProcess}, args...)
 	return syscall.Exec(
-		assets.ResolvePath(
-			r.BackendAssetsPath,
-			"util",
-			"llama-cpp-rpc-server",
-		),
-		append([]string{
-			assets.ResolvePath(
-				r.BackendAssetsPath,
-				"util",
-				"llama-cpp-rpc-server",
-			)}, os.Args[4:]...),
+		grpcProcess,
+		args,
 		os.Environ())
 }
